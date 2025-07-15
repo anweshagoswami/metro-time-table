@@ -1,16 +1,15 @@
-
+// server/utils/timeUtils.js
 function parseTime(hhmm) {
-  const [h, m] = hhmm.split(':').map(Number);
-  const now = new Date();
-  now.setHours(h, m, 0, 0); // set HH:MM:00.000
-  return now;
+  const [h,m] = hhmm.split(':').map(Number);
+  const d = new Date();
+  d.setHours(h, m, 0, 0);
+  return d;
 }
 
-
 function formatTime(date) {
-  const h = date.getHours();
-  const m = date.getMinutes();
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+  const hh = String(date.getHours()).padStart(2,'0');
+  const mm = String(date.getMinutes()).padStart(2,'0');
+  return `${hh}:${mm}`;
 }
 
 module.exports = { parseTime, formatTime };
