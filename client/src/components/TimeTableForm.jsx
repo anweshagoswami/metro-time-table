@@ -1,156 +1,114 @@
-// client/src/components/TimeTableForm.jsx
+
 import React, { useState } from 'react';
 import { generateTimetable } from '../utils/api';
 
 export default function TimeTableForm({ onGenerate }) {
-  // 1) Operating window
   const [upStart, setUpStart] = useState('06:00');
-  const [upEnd,   setUpEnd]   = useState('22:00');
+  const [upEnd, setUpEnd] = useState('22:00');
   const [dnStart, setDnStart] = useState('06:00');
-  const [dnEnd,   setDnEnd]   = useState('22:00');
-
-  // 2) Frequency intervals
+  const [dnEnd, setDnEnd] = useState('22:00');
   const [intervalsUp, setIntervalsUp] = useState([{ from: '06:00', to: '10:00', freq: '10' }]);
   const [intervalsDn, setIntervalsDn] = useState([{ from: '06:00', to: '10:00', freq: '10' }]);
 
-  // 3) Constraints
-  const [totalRakes,   setTotalRakes]   = useState(20);
-  const [serviceCount, setServiceCount] = useState(50);
-  const [shadeToLine,  setShadeToLine]  = useState(5);
-  const [shadeCapKS,   setShadeCapKS]   = useState(30);
-  const [shadeCapNP,   setShadeCapNP]   = useState(30);
-  const [rakeReversal, setRakeReversal] = useState(3);
-
   const updateInterval = (dir, idx, field, value) => {
-    const arr = dir==='up'?[...intervalsUp]:[...intervalsDn];
+    const arr = dir === 'up' ? [...intervalsUp] : [...intervalsDn];
     arr[idx][field] = value;
-    dir==='up'?setIntervalsUp(arr):setIntervalsDn(arr);
+    dir === 'up' ? setIntervalsUp(arr) : setIntervalsDn(arr);
   };
 
   const addInterval = dir => {
-    const blank = { from:'',to:'',freq:'' };
-    dir==='up'?setIntervalsUp([...intervalsUp,blank]):setIntervalsDn([...intervalsDn,blank]);
+    if (dir === 'up') setIntervalsUp([...intervalsUp, { from: '', to: '', freq: '' }]);
+    else setIntervalsDn([...intervalsDn, { from: '', to: '', freq: '' }]);
   };
 
-  const validateIntervals = (ints, start, end) =>
-    ints.every(({ from,to,freq }) =>
-      from && to && freq && from<to && from>=start && to<=end
-    );
+  const validateIntervals = (intervals, start, end) => {
+    return intervals.every(({ from, to, freq }) => {
+      if (!from || !to || !freq) return false;
+      if (from < start || to > end) return false;
+      if (from >= to) return false;
+      return true;
+    });
+  };
 
   const handleSubmit = async e => {
     e.preventDefault();
-
     if (!validateIntervals(intervalsUp, upStart, upEnd)) {
-      return alert('Check UP intervals vs operating window');
+      alert('UP intervals must be within UP Start and End times, and From < To');
+      return;
     }
     if (!validateIntervals(intervalsDn, dnStart, dnEnd)) {
-      return alert('Check DN intervals vs operating window');
+      alert('DN intervals must be within DN Start and End times, and From < To');
+      return;
     }
 
-    const payload = {
-      upStart, upEnd,
-      downStart: dnStart, downEnd: dnEnd,
-      upIntervals:   intervalsUp.map(({ from,to,freq }) => ({ from,to,frequency:Number(freq) })),
-      downIntervals: intervalsDn.map(({ from,to,freq }) => ({ from,to,frequency:Number(freq) })),
-      totalRakes,
-      serviceCount,
-      shadeToLine,
-      shadeCapacityKS: shadeCapKS,
-      shadeCapacityNP: shadeCapNP,
-      rakeReversal
-    };
+    const upIntervals = intervalsUp.map(({ from, to, freq }) => ({ from, to, frequency: Number(freq) }));
+    const downIntervals = intervalsDn.map(({ from, to, freq }) => ({ from, to, frequency: Number(freq) }));
 
     try {
-      const data = await generateTimetable(payload);
+      const data = await generateTimetable({
+        upStart,
+        upEnd,
+        downStart: dnStart,
+        downEnd: dnEnd,
+        upIntervals,
+        downIntervals
+      });
       const combined = [
-        ...(Array.isArray(data.up)?data.up:[]),
-        ...(Array.isArray(data.down)?data.down:[])
+        ...(Array.isArray(data.up) ? data.up : []),
+        ...(Array.isArray(data.down) ? data.down : [])
       ];
       onGenerate(combined);
     } catch (err) {
-      alert('Error: ' + err.message);
+      alert('Error generating timetable: ' + err.message);
     }
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      {/* Operating Window */}
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label>UP Start Time</label>
-          <input type="time" value={upStart} onChange={e=>setUpStart(e.target.value)} className="p-2 border rounded w-full"/>
+          <label className="block font-semibold">UP Start Time</label>
+          <input type="time" value={upStart} onChange={e => setUpStart(e.target.value)} className="w-full p-2 border rounded" />
         </div>
         <div>
-          <label>UP End Time</label>
-          <input type="time" value={upEnd}   onChange={e=>setUpEnd(e.target.value)}   className="p-2 border rounded w-full"/>
+          <label className="block font-semibold">UP End Time</label>
+          <input type="time" value={upEnd} onChange={e => setUpEnd(e.target.value)} className="w-full p-2 border rounded" />
         </div>
         <div>
-          <label>DN Start Time</label>
-          <input type="time" value={dnStart} onChange={e=>setDnStart(e.target.value)} className="p-2 border rounded w-full"/>
+          <label className="block font-semibold">DN Start Time</label>
+          <input type="time" value={dnStart} onChange={e => setDnStart(e.target.value)} className="w-full p-2 border rounded" />
         </div>
         <div>
-          <label>DN End Time</label>
-          <input type="time" value={dnEnd}   onChange={e=>setDnEnd(e.target.value)}   className="p-2 border rounded w-full"/>
+          <label className="block font-semibold">DN End Time</label>
+          <input type="time" value={dnEnd} onChange={e => setDnEnd(e.target.value)} className="w-full p-2 border rounded" />
         </div>
       </div>
 
-      {/* UP Intervals */}
       <div>
-        <h3>UP Intervals</h3>
-        {intervalsUp.map((int,i)=>(
-          <div key={i} className="grid grid-cols-3 gap-2 mb-2">
-            <input type="time" value={int.from} onChange={e=>updateInterval('up',i,'from',e.target.value)} className="p-2 border rounded"/>
-            <input type="time" value={int.to}   onChange={e=>updateInterval('up',i,'to',e.target.value)}   className="p-2 border rounded"/>
-            <input type="number" value={int.freq} onChange={e=>updateInterval('up',i,'freq',e.target.value)} placeholder="Freq" className="p-2 border rounded"/>
+        <h3 className="font-bold text-lg mb-2">UP Intervals</h3>
+        {intervalsUp.map((int, idx) => (
+          <div key={idx} className="grid grid-cols-3 gap-2 mb-2">
+            <input type="time" value={int.from} onChange={e => updateInterval('up', idx, 'from', e.target.value)} className="p-2 border rounded" />
+            <input type="time" value={int.to} onChange={e => updateInterval('up', idx, 'to', e.target.value)} className="p-2 border rounded" />
+            <input type="number" value={int.freq} onChange={e => updateInterval('up', idx, 'freq', e.target.value)} className="p-2 border rounded" placeholder="Freq (min)" />
           </div>
         ))}
-        <button type="button" onClick={()=>addInterval('up')} className="text-blue-500">Add Interval</button>
+        <button type="button" onClick={() => addInterval('up')} className="mt-1 text-blue-500 underline">Add Interval</button>
       </div>
 
-      {/* DN Intervals */}
       <div>
-        <h3>DN Intervals</h3>
-        {intervalsDn.map((int,i)=>(
-          <div key={i} className="grid grid-cols-3 gap-2 mb-2">
-            <input type="time" value={int.from} onChange={e=>updateInterval('dn',i,'from',e.target.value)} className="p-2 border rounded"/>
-            <input type="time" value={int.to}   onChange={e=>updateInterval('dn',i,'to',e.target.value)}   className="p-2 border rounded"/>
-            <input type="number" value={int.freq} onChange={e=>updateInterval('dn',i,'freq',e.target.value)} placeholder="Freq" className="p-2 border rounded"/>
+        <h3 className="font-bold text-lg mb-2">DN Intervals</h3>
+        {intervalsDn.map((int, idx) => (
+          <div key={idx} className="grid grid-cols-3 gap-2 mb-2">
+            <input type="time" value={int.from} onChange={e => updateInterval('dn', idx, 'from', e.target.value)} className="p-2 border rounded" />
+            <input type="time" value={int.to} onChange={e => updateInterval('dn', idx, 'to', e.target.value)} className="p-2 border rounded" />
+            <input type="number" value={int.freq} onChange={e => updateInterval('dn', idx, 'freq', e.target.value)} className="p-2 border rounded" placeholder="Freq (min)" />
           </div>
         ))}
-        <button type="button" onClick={()=>addInterval('dn')} className="text-blue-500">Add Interval</button>
+        <button type="button" onClick={() => addInterval('dn')} className="mt-1 text-blue-500 underline">Add Interval</button>
       </div>
 
-      {/* Constraints */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        <div>
-          <label>Total Rakes Available</label>
-          <input type="number" min="1" value={totalRakes} onChange={e=>setTotalRakes(Number(e.target.value))} className="p-2 border rounded w-full"/>
-        </div>
-        <div>
-          <label>Number of Services</label>
-          <input type="number" min="1" value={serviceCount} onChange={e=>setServiceCount(Number(e.target.value))} className="p-2 border rounded w-full"/>
-        </div>
-        <div>
-          <label>Shade‑to‑Line Time (min)</label>
-          <input type="number" min="0" value={shadeToLine} onChange={e=>setShadeToLine(Number(e.target.value))} className="p-2 border rounded w-full"/>
-        </div>
-        <div>
-          <label>Shade Capacity (KS)</label>
-          <input type="number" min="1" value={shadeCapKS} onChange={e=>setShadeCapKS(Number(e.target.value))} className="p-2 border rounded w-full"/>
-        </div>
-        <div>
-          <label>Shade Capacity (NP)</label>
-          <input type="number" min="1" value={shadeCapNP} onChange={e=>setShadeCapNP(Number(e.target.value))} className="p-2 border rounded w-full"/>
-        </div>
-        <div>
-          <label>Rake Reversal Time (min)</label>
-          <input type="number" min="0" value={rakeReversal} onChange={e=>setRakeReversal(Number(e.target.value))} className="p-2 border rounded w-full"/>
-        </div>
-      </div>
-
-      <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded">
-        Generate Time Table
-      </button>
+      <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded">Generate Time Table</button>
     </form>
   );
 }
