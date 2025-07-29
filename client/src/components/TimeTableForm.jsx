@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { generateTimetable } from '../utils/api';
 
@@ -7,8 +6,17 @@ export default function TimeTableForm({ onGenerate }) {
   const [upEnd, setUpEnd] = useState('22:00');
   const [dnStart, setDnStart] = useState('06:00');
   const [dnEnd, setDnEnd] = useState('22:00');
-  const [intervalsUp, setIntervalsUp] = useState([{ from: '06:00', to: '10:00', freq: '10' }]);
-  const [intervalsDn, setIntervalsDn] = useState([{ from: '06:00', to: '10:00', freq: '10' }]);
+
+  const [intervalsUp, setIntervalsUp] = useState([{ from: '', to: '', freq: '' }]);
+  const [intervalsDn, setIntervalsDn] = useState([{ from: '', to: '', freq: '' }]);
+
+  const [totalRakes, setTotalRakes] = useState(4);
+  const [shadeToLine, setShadeToLine] = useState(5);
+  const [rakeReversal, setRakeReversal] = useState(5);
+  const [shadeCapacityNP, setShadeCapacityNP] = useState(2);
+  const [shadeCapacityKS, setShadeCapacityKS] = useState(2);
+  const [singleTrackBuffer, setSingleTrackBuffer] = useState(3);
+  const [totalServices, setTotalServices] = useState(20);
 
   const updateInterval = (dir, idx, field, value) => {
     const arr = dir === 'up' ? [...intervalsUp] : [...intervalsDn];
@@ -17,95 +25,121 @@ export default function TimeTableForm({ onGenerate }) {
   };
 
   const addInterval = dir => {
-    if (dir === 'up') setIntervalsUp([...intervalsUp, { from: '', to: '', freq: '' }]);
-    else setIntervalsDn([...intervalsDn, { from: '', to: '', freq: '' }]);
-  };
-
-  const validateIntervals = (intervals, start, end) => {
-    return intervals.every(({ from, to, freq }) => {
-      if (!from || !to || !freq) return false;
-      if (from < start || to > end) return false;
-      if (from >= to) return false;
-      return true;
-    });
+    const arr = { from: '', to: '', freq: '' };
+    dir === 'up' ? setIntervalsUp([...intervalsUp, arr]) : setIntervalsDn([...intervalsDn, arr]);
   };
 
   const handleSubmit = async e => {
     e.preventDefault();
-    if (!validateIntervals(intervalsUp, upStart, upEnd)) {
-      alert('UP intervals must be within UP Start and End times, and From < To');
-      return;
-    }
-    if (!validateIntervals(intervalsDn, dnStart, dnEnd)) {
-      alert('DN intervals must be within DN Start and End times, and From < To');
-      return;
-    }
+    const upBlocks = intervalsUp.map(({ from, to, freq }) => ({
+      from, to, frequency: Number(freq)
+    }));
+    const dnBlocks = intervalsDn.map(({ from, to, freq }) => ({
+      from, to, frequency: Number(freq)
+    }));
 
-    const upIntervals = intervalsUp.map(({ from, to, freq }) => ({ from, to, frequency: Number(freq) }));
-    const downIntervals = intervalsDn.map(({ from, to, freq }) => ({ from, to, frequency: Number(freq) }));
+    const payload = {
+      upStart,
+      upEnd,
+      downStart: dnStart,
+      downEnd: dnEnd,
+      upIntervals: upBlocks,
+      downIntervals: dnBlocks,
+      totalRakes,
+      shadeToLine,
+      reversalTime: rakeReversal,
+      shadeCapacityUp: shadeCapacityKS,
+      shadeCapacityDown: shadeCapacityNP,
+      singleTrackBuffer,
+      totalServices,
+    };
 
     try {
-      const data = await generateTimetable({
-        upStart,
-        upEnd,
-        downStart: dnStart,
-        downEnd: dnEnd,
-        upIntervals,
-        downIntervals
-      });
-      const combined = [
-        ...(Array.isArray(data.up) ? data.up : []),
-        ...(Array.isArray(data.down) ? data.down : [])
-      ];
-      onGenerate(combined);
+      const data = await generateTimetable(payload);
+      onGenerate([...(data.up || []), ...(data.down || [])]);
     } catch (err) {
-      alert('Error generating timetable: ' + err.message);
+      alert(`Error: ${err.response?.data?.error || err.message}`);
     }
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      {/* Time Ranges */}
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block font-semibold">UP Start Time</label>
-          <input type="time" value={upStart} onChange={e => setUpStart(e.target.value)} className="w-full p-2 border rounded" />
+          <label>UP Start Time</label>
+          <input type="time" value={upStart} onChange={e => setUpStart(e.target.value)} className="w-full" />
         </div>
         <div>
-          <label className="block font-semibold">UP End Time</label>
-          <input type="time" value={upEnd} onChange={e => setUpEnd(e.target.value)} className="w-full p-2 border rounded" />
+          <label>UP End Time</label>
+          <input type="time" value={upEnd} onChange={e => setUpEnd(e.target.value)} className="w-full" />
         </div>
         <div>
-          <label className="block font-semibold">DN Start Time</label>
-          <input type="time" value={dnStart} onChange={e => setDnStart(e.target.value)} className="w-full p-2 border rounded" />
+          <label>DN Start Time</label>
+          <input type="time" value={dnStart} onChange={e => setDnStart(e.target.value)} className="w-full" />
         </div>
         <div>
-          <label className="block font-semibold">DN End Time</label>
-          <input type="time" value={dnEnd} onChange={e => setDnEnd(e.target.value)} className="w-full p-2 border rounded" />
+          <label>DN End Time</label>
+          <input type="time" value={dnEnd} onChange={e => setDnEnd(e.target.value)} className="w-full" />
         </div>
       </div>
 
+      {/* UP Intervals */}
       <div>
-        <h3 className="font-bold text-lg mb-2">UP Intervals</h3>
-        {intervalsUp.map((int, idx) => (
-          <div key={idx} className="grid grid-cols-3 gap-2 mb-2">
-            <input type="time" value={int.from} onChange={e => updateInterval('up', idx, 'from', e.target.value)} className="p-2 border rounded" />
-            <input type="time" value={int.to} onChange={e => updateInterval('up', idx, 'to', e.target.value)} className="p-2 border rounded" />
-            <input type="number" value={int.freq} onChange={e => updateInterval('up', idx, 'freq', e.target.value)} className="p-2 border rounded" placeholder="Freq (min)" />
+        <h2 className="font-semibold text-lg">UP Intervals</h2>
+        {intervalsUp.map((block, idx) => (
+          <div key={idx} className="flex gap-2 mb-2">
+            <input type="time" value={block.from} onChange={e => updateInterval('up', idx, 'from', e.target.value)} className="flex-1" />
+            <input type="time" value={block.to} onChange={e => updateInterval('up', idx, 'to', e.target.value)} className="flex-1" />
+            <input type="number" value={block.freq} onChange={e => updateInterval('up', idx, 'freq', e.target.value)} placeholder="Freq" className="w-20" />
           </div>
         ))}
-        <button type="button" onClick={() => addInterval('up')} className="mt-1 text-blue-500 underline">Add Interval</button>
+        <button type="button" onClick={() => addInterval('up')} className="text-blue-600">+ Add Interval</button>
       </div>
 
+      {/* DN Intervals */}
       <div>
-        <h3 className="font-bold text-lg mb-2">DN Intervals</h3>
-        {intervalsDn.map((int, idx) => (
-          <div key={idx} className="grid grid-cols-3 gap-2 mb-2">
-            <input type="time" value={int.from} onChange={e => updateInterval('dn', idx, 'from', e.target.value)} className="p-2 border rounded" />
-            <input type="time" value={int.to} onChange={e => updateInterval('dn', idx, 'to', e.target.value)} className="p-2 border rounded" />
-            <input type="number" value={int.freq} onChange={e => updateInterval('dn', idx, 'freq', e.target.value)} className="p-2 border rounded" placeholder="Freq (min)" />
+        <h2 className="font-semibold text-lg">DN Intervals</h2>
+        {intervalsDn.map((block, idx) => (
+          <div key={idx} className="flex gap-2 mb-2">
+            <input type="time" value={block.from} onChange={e => updateInterval('down', idx, 'from', e.target.value)} className="flex-1" />
+            <input type="time" value={block.to} onChange={e => updateInterval('down', idx, 'to', e.target.value)} className="flex-1" />
+            <input type="number" value={block.freq} onChange={e => updateInterval('down', idx, 'freq', e.target.value)} placeholder="Freq" className="w-20" />
           </div>
         ))}
-        <button type="button" onClick={() => addInterval('dn')} className="mt-1 text-blue-500 underline">Add Interval</button>
+        <button type="button" onClick={() => addInterval('down')} className="text-blue-600">+ Add Interval</button>
+      </div>
+
+      {/* Rake + Yard Config */}
+      <div className="grid grid-cols-3 gap-4">
+        <div>
+          <label>Total Rakes Available</label>
+          <input type="number" value={totalRakes} onChange={e => setTotalRakes(+e.target.value)} className="w-full" />
+        </div>
+        <div>
+          <label>Shade Capacity (Noapara)</label>
+          <input type="number" value={shadeCapacityNP} onChange={e => setShadeCapacityNP(+e.target.value)} className="w-full" />
+        </div>
+        <div>
+          <label>Shade Capacity (Kavi Subhash)</label>
+          <input type="number" value={shadeCapacityKS} onChange={e => setShadeCapacityKS(+e.target.value)} className="w-full" />
+        </div>
+        <div>
+          <label>Shade → Line Time (min)</label>
+          <input type="number" value={shadeToLine} onChange={e => setShadeToLine(+e.target.value)} className="w-full" />
+        </div>
+        <div>
+          <label>Rake Reversal Time (min)</label>
+          <input type="number" value={rakeReversal} onChange={e => setRakeReversal(+e.target.value)} className="w-full" />
+        </div>
+        <div>
+          <label>Single Track Buffer (min)</label>
+          <input type="number" value={singleTrackBuffer} onChange={e => setSingleTrackBuffer(+e.target.value)} className="w-full" />
+        </div>
+        <div>
+          <label>Total Services Needed</label>
+          <input type="number" value={totalServices} onChange={e => setTotalServices(+e.target.value)} className="w-full" />
+        </div>
       </div>
 
       <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded">Generate Time Table</button>
